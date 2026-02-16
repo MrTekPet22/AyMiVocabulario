@@ -39,6 +39,7 @@
             width: min(95vw, 700px);
             margin: 1.5rem auto;
             aspect-ratio: 1 / 1;
+            position: relative;
         }
 
         #board {
@@ -48,24 +49,36 @@
             width: 100%; height: 100%;
             border: 8px solid var(--spain-yellow);
             border-radius: 12px;
-            background: #fff;
+            background: #ffffff;
             box-shadow: 0 15px 35px rgba(0,0,0,0.1);
+            position: relative;
+            z-index: 5;
         }
 
         .cell {
-            border: 1px solid rgba(0, 0, 0, 0.04);
+            border: 1px solid rgba(0, 0, 0, 0.1);
             position: relative;
             display: flex; align-items: center; justify-content: center;
-            font-size: 1.2rem; font-weight: 800; color: rgba(0,0,0,0.1);
+            font-size: 1.1rem; font-weight: 800; 
+            color: rgba(67, 40, 24, 0.6);
         }
-        .cell:nth-child(even) { background-color: #fffdf2; }
+        .cell:nth-child(even) { background-color: #fffef7; }
+
+        .obstacle-emoji {
+            position: absolute;
+            font-size: 2.2rem;
+            z-index: 8;
+            pointer-events: none;
+            opacity: 1;
+            filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+        }
 
         .player-avatar {
             width: 32px; height: 32px;
             border-radius: 6px;
             position: absolute;
             border: 2px solid white;
-            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             z-index: 20;
             display: flex; align-items: center; justify-content: center;
             box-shadow: 0 4px 6px rgba(0,0,0,0.2);
@@ -73,6 +86,7 @@
             pointer-events: none;
             background-size: cover;
             background-position: center;
+            background-repeat: no-repeat;
             overflow: hidden;
             color: white; 
             text-shadow: 0px 0px 3px rgba(0,0,0,0.5);
@@ -92,13 +106,20 @@
         }
 
         .avatar-option {
-            cursor: pointer; transition: transform 0.2s;
+            cursor: pointer; transition: all 0.2s;
             font-size: 1.2rem; padding: 2px; border-radius: 6px;
             border: 2px solid transparent;
             width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
         }
-        .avatar-option:hover { transform: scale(1.1); background: #fef3c7; }
+        .avatar-option:hover:not(.avatar-taken) { transform: scale(1.1); background: #fef3c7; }
         .avatar-selected { border-color: var(--spain-yellow); background: #fffbeb !important; }
+        
+        .avatar-taken {
+            opacity: 0.15;
+            cursor: not-allowed;
+            filter: grayscale(1);
+            pointer-events: none;
+        }
 
         .dice-box { width: 70px; height: 70px; perspective: 1000px; display: inline-block; }
         .dice { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.6s; }
@@ -113,24 +134,14 @@
             border-top: 1px solid rgba(0,0,0,0.08); color: #78350f; font-size: 0.85rem;
             line-height: 1.6;
         }
-
-        .smoke-particle {
-            position: absolute; pointer-events: none; border-radius: 50%;
-            background: rgba(180, 180, 180, 0.5); animation: smoke-rise linear forwards;
-            z-index: 2000;
-        }
-        @keyframes smoke-rise {
-            0% { transform: scale(1) translate(0, 0); opacity: 0.6; }
-            100% { transform: scale(3) translate(var(--tx), var(--ty)); opacity: 0; }
-        }
     </style>
 </head>
 <body class="flex flex-col items-center">
 
     <div id="splash-screen" onclick="dismissSplash()">
         <div class="text-white cursor-pointer text-center">
-            <h1 class="text-7xl font-bold mb-4 drop-shadow-lg">¡BIENVENIDOS!</h1>
-            <p class="text-xl tracking-widest animate-pulse font-semibold">COLEGIO SAN JUAN - EISTEDDFOD 2026</p>
+            <h1 class="text-7xl font-bold mb-4 drop-shadow-lg uppercase">¡Bienvenidos!</h1>
+            <p class="text-xl tracking-widest animate-pulse font-semibold">Spanish Learning Quest</p>
             <p class="mt-8 text-sm opacity-80 uppercase tracking-tighter">[ CLICK ANYWHERE TO START ]</p>
         </div>
     </div>
@@ -140,14 +151,27 @@
         <header class="mb-6">
             <h1 class="text-6xl text-red-700 font-black mb-3 italic">¡Ay, mi vocabulario!</h1>
             <div class="flex gap-3 justify-center">
-                <button onclick="downloadGameData()" class="text-xs font-bold bg-white border-2 border-yellow-400 px-4 py-1.5 rounded-full shadow-sm hover:bg-yellow-50">💾 Save</button>
+                <button onclick="downloadGameData()" class="text-xs font-bold bg-white border-2 border-yellow-400 px-4 py-1.5 rounded-full shadow-sm hover:bg-yellow-50">💾 Save Progress</button>
                 <label class="text-xs font-bold bg-white border-2 border-yellow-400 px-4 py-1.5 rounded-full shadow-sm hover:bg-yellow-50 cursor-pointer">
-                    📂 Load <input type="file" id="loadInput" class="hidden" accept=".json" onchange="loadGameData(event)">
+                    📂 Load File <input type="file" id="loadInput" class="hidden" accept=".json" onchange="loadGameData(event)">
                 </label>
             </div>
         </header>
 
         <section id="setupArea" class="w-full">
+            <div class="glass-panel mb-6 bg-yellow-50 border-dashed">
+                <h2 class="text-xl font-black text-red-800 uppercase mb-3 flex items-center justify-center gap-2">
+                    📜 Game Rules
+                </h2>
+                <ul class="text-left text-sm space-y-2 font-bold text-stone-700">
+                    <li class="flex gap-2"><span>🎲</span> <span>Roll the dice and answer correctly to move forward.</span></li>
+                    <li class="flex gap-2"><span>🪜</span> <span><strong>Ladders:</strong> Climb up +10 squares!</span></li>
+                    <li class="flex gap-2"><span>🐍</span> <span><strong>Snakes:</strong> Slide down -10 squares!</span></li>
+                    <li class="flex gap-2"><span>🔥</span> <span><strong>Bonus:</strong> Roll a 6 for an extra turn!</span></li>
+                    <li class="flex gap-2"><span>❌</span> <span>3 wrong answers returns you to the start.</span></li>
+                </ul>
+            </div>
+
             <div class="glass-panel">
                 <div class="flex items-center justify-between mb-6">
                     <h2 class="text-xl font-black text-red-700 uppercase">1. Prepare Players</h2>
@@ -168,7 +192,7 @@
         <section id="gameUI" class="hidden w-full">
             <div class="glass-panel flex justify-between items-center px-8">
                 <div class="flex items-center gap-4">
-                    <div id="pAvatarDisplay" class="text-5xl bg-yellow-100 p-2 rounded-xl border-2 border-yellow-400 w-16 h-16 flex items-center justify-center overflow-hidden">👤</div>
+                    <div id="pAvatarDisplay" class="text-5xl bg-yellow-100 p-2 rounded-xl border-2 border-yellow-400 w-16 h-16 flex items-center justify-center overflow-hidden bg-center bg-cover">👤</div>
                     <div class="text-left">
                         <p class="text-[10px] text-stone-400 uppercase font-black">Turno de</p>
                         <h3 id="turnDisplay" class="text-2xl font-black leading-tight">...</h3>
@@ -196,20 +220,16 @@
                     <div class="dice-box"><div id="dice" class="dice"><div class="die-face flex items-center justify-center bg-white border-2 border-stone-200 rounded-xl text-4xl w-full h-full">🎲</div></div></div>
                     <button id="rollBtn" onclick="rollDice()" class="bg-red-600 text-white px-12 py-4 rounded-xl font-black text-lg shadow-xl hover:bg-red-700 transition border-b-4 border-red-900">ROLL DICE</button>
                 </div>
-                <div class="font-black text-stone-400 text-xs">SQUARE: <span id="posDisplay" class="text-red-600 text-xl">01</span> / 100</div>
+                <div class="font-black text-stone-400 text-xs uppercase">SQUARE: <span id="posDisplay" class="text-red-600 text-xl">01</span> / 100</div>
             </div>
 
-            <div id="board-container"><div id="board"></div></div>
+            <div id="board-container">
+                <div id="board"></div>
+            </div>
         </section>
 
         <footer class="copyright-section">
-            <p id="code-stats" class="mb-4 font-black text-red-800 text-[11px] opacity-60 uppercase tracking-widest"></p>
-            <p class="mb-4 font-medium italic text-stone-600">
-                This project - <span id="chaos-stats">...</span> of handcrafted chaos - is the product of <strong>way</strong> too much caffeine; blood, sweat, and tears; and not nearly enough sleep. 
-                So do me a favour: <strong>don’t steal it, don’t sell it, and don’t Frankenstein it into something else.</strong> 
-                It’s licensed under CC BY-NC-ND, which means respect the work or go write your own (but don't steal my idea 👀).
-            </p>
-            <p class="text-stone-400 font-bold text-[10px] tracking-widest uppercase">© 2026 Ayden Kharoti. All rights reserved.</p>
+            <p id="code-stats" class="mb-4 text-stone-700 text-sm"></p>
         </footer>
     </div>
 
@@ -218,9 +238,9 @@
     </div>
 
     <script>
-        const LADDERS = { 6: 25, 14: 36, 21: 42, 35: 58, 52: 74, 66: 88, 77: 96, 82: 98 }; 
-        const SNAKES = { 12: 3, 28: 10, 41: 19, 49: 30, 62: 45, 89: 68, 94: 75, 99: 1 };  
-        const AVATARS = ['🎲', '🏹', '🛡️', '⚔️', '🧙', '👑', '🐉', '💃', '🥘', '🦊', '🦄', '🌮', '🎭', '🎨', '🦁', '🦉', '🍕', '⚽', '🚀'];
+        const LADDERS = [12, 25, 38, 52, 67, 81]; 
+        const SNAKES = [18, 31, 45, 62, 77, 94];  
+        const AVATARS = ['🇪🇸', '🥘', '💃', '🎸', '🍊', '⚽', '🐂', '🏛️', '🎭', '🏰', '🌊', '🌞', '🍷', '🥖'];
         const SPANISH_NAMES = ['Alejandro', 'Beatriz', 'Carlos', 'Diego', 'Elena', 'Fernando', 'Gabriela', 'Hugo', 'Isabel', 'Javier', 'Lucía', 'Mateo'];
         
         const QUESTIONS = [
@@ -228,7 +248,9 @@
             { q: "¿Qué es 'Hermano' en inglés?\nA: Brother | B: Cousin | C: Uncle", a: "A" },
             { q: "¿Cómo se dice 'I am 12 years old' en español?\nA: Soy 12 | B: Tengo 12 años | C: Estoy 12", a: "B" },
             { q: "¿De qué color es 'Amarillo'?\nA: Azul | B: Verde | C: Amarillo", a: "C" },
-            { q: "¿Cómo se dice 'Library' en español?\nA: Librería | B: Biblioteca | C: Tienda", a: "B" }
+            { q: "¿Cómo se dice 'Library' en español?\nA: Librería | B: Biblioteca | C: Tienda", a: "B" },
+            { q: "¿Qué significa 'Mañana'?\nA: Morning/Tomorrow | B: Yesterday | C: Today", a: "A" },
+            { q: "¿Cómo se dice 'Please' en español?\nA: Gracias | B: De nada | C: Por favor", a: "C" }
         ];
 
         let players = [];
@@ -246,9 +268,15 @@
             const lines = code.split('\n').length;
             const words = code.split(/\s+/).filter(w => w.length > 0).length;
             const chars = code.length;
-
-            document.getElementById('code-stats').innerText = `${lines} lines - ${words} words - ${chars} characters... Of HTML, JS and CSS.`;
-            document.getElementById('chaos-stats').innerText = `${lines} lines, ${words} words, and ${chars} characters`;
+            
+            document.getElementById('code-stats').innerHTML = `
+                ${lines} lines - ${words} words - ${chars} characters... Of HTML, JS and CSS. 
+                This project - ${lines} lines, ${words} words, and ${chars} characters of handcrafted chaos - is the product of way too much caffeine; blood, sweat, and tears; and not nearly enough sleep. 
+                So do me a favour: don’t steal it, don’t sell it, and don’t Frankenstein it into something else. 
+                It’s licensed under CC BY-NC-ND, which means respect the work or go write your own (but don't steal my idea 👀). 
+                <br><br>
+                <strong>© 2026 Ayden Kharoti. All rights reserved.</strong>
+            `;
         }
 
         function dismissSplash() {
@@ -265,35 +293,60 @@
             const container = document.getElementById('playerEntries');
             container.innerHTML = '';
             playerSelection = {};
-
             let shuffled = [...AVATARS].sort(() => 0.5 - Math.random());
-
+            
             for(let i=0; i<n; i++) {
                 const defaultEmoji = shuffled[i];
                 playerSelection[i] = { type: 'emoji', val: defaultEmoji };
-
                 const div = document.createElement('div');
                 div.className = "bg-white p-3 rounded-xl border-2 border-stone-100 shadow-sm text-left";
                 div.innerHTML = `
                     <div class="flex gap-2 mb-2">
-                        <input type="text" id="name-${i}" placeholder="Jugador ${i+1}" class="flex-1 p-1.5 border-2 border-stone-100 rounded-lg font-bold text-sm outline-none focus:border-yellow-400">
+                        <input type="text" id="name-${i}" placeholder="Hero Name ${i+1}" class="flex-1 p-1.5 border-2 border-stone-100 rounded-lg font-bold text-sm outline-none focus:border-yellow-400">
                         <button onclick="randomizeName(${i})" class="bg-stone-100 px-2 rounded-lg text-xs">🎲</button>
                     </div>
-                    <div class="flex flex-wrap gap-1" id="av-list-${i}">
-                        ${AVATARS.map(a => `<span class="avatar-option ${a === defaultEmoji ? 'avatar-selected' : ''}" onclick="setAvatar(${i}, 'emoji', '${a}', this)">${a}</span>`).join('')}
-                        <label class="avatar-option bg-stone-50 border-stone-100 hover:bg-stone-100" title="Upload Pic">
-                            📷 <input type="file" class="hidden" accept="image/*" onchange="uploadPic(event, ${i})">
-                        </label>
+                    <div class="flex flex-wrap gap-1 mb-2" id="av-list-${i}">
+                        ${AVATARS.slice(0, 10).map(a => `<span data-emoji="${a}" class="avatar-option ${a === defaultEmoji ? 'avatar-selected' : ''}" onclick="setAvatar(${i}, 'emoji', '${a}', this)">${a}</span>`).join('')}
                     </div>
-                    <div id="preview-${i}" class="mt-2 flex items-center gap-2">
-                        <span class="text-[9px] font-black text-stone-300 uppercase">Selected:</span>
-                        <div id="prev-box-${i}" class="w-6 h-6 rounded bg-stone-50 border border-stone-200 flex items-center justify-center text-xs overflow-hidden">
-                            ${defaultEmoji}
-                        </div>
+                    <div class="flex items-center gap-2">
+                        <label class="bg-red-100 text-red-700 text-[10px] px-3 py-1.5 rounded-full font-bold cursor-pointer hover:bg-red-200 transition">
+                            📷 Upload Photo
+                            <input type="file" class="hidden" accept="image/*" onchange="handleImageUpload(event, ${i})">
+                        </label>
+                        <div id="prev-box-${i}" class="w-8 h-8 rounded bg-stone-50 border border-stone-200 flex items-center justify-center text-xs overflow-hidden bg-cover bg-center">${defaultEmoji}</div>
                     </div>
                 `;
                 container.appendChild(div);
             }
+            refreshTakenAvatars();
+        }
+
+        function refreshTakenAvatars() {
+            const allTakenValues = Object.entries(playerSelection).map(([idx, sel]) => sel.val);
+            
+            document.querySelectorAll('[id^="av-list-"]').forEach((list, playerIdx) => {
+                const currentPlayerVal = playerSelection[playerIdx].val;
+                
+                list.querySelectorAll('.avatar-option').forEach(option => {
+                    const emoji = option.getAttribute('data-emoji');
+                    if (allTakenValues.includes(emoji) && emoji !== currentPlayerVal) {
+                        option.classList.add('avatar-taken');
+                    } else {
+                        option.classList.remove('avatar-taken');
+                    }
+                });
+            });
+        }
+
+        function handleImageUpload(e, pIdx) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const dataUrl = ev.target.result;
+                setAvatar(pIdx, 'image', dataUrl, null);
+            };
+            reader.readAsDataURL(file);
         }
 
         function randomizeName(idx) {
@@ -304,26 +357,17 @@
             playerSelection[pIdx] = { type, val };
             const list = document.getElementById(`av-list-${pIdx}`);
             list.querySelectorAll('.avatar-option').forEach(o => o.classList.remove('avatar-selected'));
-            if(el) el.classList.add('avatar-selected');
+            if (el) el.classList.add('avatar-selected');
 
             const box = document.getElementById(`prev-box-${pIdx}`);
-            if(type === 'emoji') {
-                box.innerHTML = val; box.style.backgroundImage = '';
+            if (type === 'image') {
+                box.innerText = '';
+                box.style.backgroundImage = `url(${val})`;
             } else {
-                box.innerHTML = ''; box.style.backgroundImage = `url(${val})`;
-                box.style.backgroundSize = 'cover'; box.style.backgroundPosition = 'center';
+                box.innerText = val;
+                box.style.backgroundImage = 'none';
             }
-        }
-
-        function uploadPic(e, pIdx) {
-            const file = e.target.files[0];
-            if(!file) return;
-            const reader = new FileReader();
-            reader.onload = (ev) => {
-                const label = e.target.closest('label');
-                setAvatar(pIdx, 'img', ev.target.result, label);
-            };
-            reader.readAsDataURL(file);
+            refreshTakenAvatars();
         }
 
         function startGame() {
@@ -338,10 +382,6 @@
                     color: ['#AA151B', '#166534', '#1e40af', '#92400e'][i]
                 });
             }
-            const btn = document.getElementById('startGameButton');
-            const rect = btn.getBoundingClientRect();
-            createSmokeEffect(rect.left + rect.width/2, rect.top + rect.height/2);
-            
             document.getElementById('setupArea').classList.add('hidden');
             document.getElementById('gameUI').classList.remove('hidden');
             initBoard();
@@ -358,6 +398,8 @@
                     cell.className = 'cell';
                     cell.id = `c-${num}`;
                     cell.innerHTML = `<span>${num}</span>`;
+                    if (LADDERS.includes(num)) cell.innerHTML += `<span class="obstacle-emoji">🪜</span>`;
+                    else if (SNAKES.includes(num)) cell.innerHTML += `<span class="obstacle-emoji">🐍</span>`;
                     b.appendChild(cell);
                 }
             }
@@ -389,10 +431,8 @@
             const input = document.getElementById('quizInput');
             const ans = input.value.trim().toUpperCase();
             if(!['A', 'B', 'C'].includes(ans)) return;
-            
             const p = players[currentPlayer];
             document.getElementById('quizBox').classList.add('hidden');
-            
             if(ans === window.activeRound.correct) {
                 p.strikes = 0;
                 showFeedback(true);
@@ -415,16 +455,31 @@
                 document.getElementById('posDisplay').innerText = p.pos.toString().padStart(2, '0');
                 await new Promise(r => setTimeout(r, 200));
             }
-            if(LADDERS[p.pos]) p.pos = LADDERS[p.pos];
-            if(SNAKES[p.pos]) p.pos = SNAKES[p.pos];
-            
-            drawMarkers();
-            if(p.pos >= 100) alert(`${p.name} Wins!`);
-            
+            if(LADDERS.includes(p.pos)) {
+                await new Promise(r => setTimeout(r, 500));
+                p.pos = Math.min(100, p.pos + 10);
+                drawMarkers();
+            } else if(SNAKES.includes(p.pos)) {
+                await new Promise(r => setTimeout(r, 500));
+                p.pos = Math.max(1, p.pos - 10);
+                drawMarkers();
+            }
+            if(p.pos >= 100) {
+                alert(`¡FELICIDADES! ${p.name} has ganado.`);
+                location.reload(); 
+                return;
+            }
             isMoving = false;
             document.getElementById('rollBtn').disabled = false;
-            if(window.activeRound.roll !== 6) nextTurn();
-            else updateUI();
+            if(window.activeRound.roll === 6) {
+                updateUI();
+                const txt = document.getElementById('feedback-text');
+                txt.innerText = '🔥 Extra Turn!';
+                document.getElementById('feedback-overlay').classList.replace('opacity-0', 'opacity-100');
+                setTimeout(() => document.getElementById('feedback-overlay').classList.replace('opacity-100', 'opacity-0'), 1000);
+            } else {
+                nextTurn();
+            }
         }
 
         function nextTurn() {
@@ -437,17 +492,14 @@
             const display = document.getElementById('pAvatarDisplay');
             document.getElementById('turnDisplay').innerText = p.name;
             document.getElementById('turnDisplay').style.color = p.color;
-            
-            if(p.avatarType === 'emoji') {
-                display.innerText = p.avatar;
-                display.style.backgroundImage = '';
-            } else {
+            if (p.avatarType === 'image') {
                 display.innerText = '';
                 display.style.backgroundImage = `url(${p.avatar})`;
-                display.style.backgroundSize = 'cover';
-                display.style.backgroundPosition = 'center';
+            } else {
+                display.innerText = p.avatar;
+                display.style.backgroundImage = 'none';
             }
-            
+            document.getElementById('posDisplay').innerText = p.pos.toString().padStart(2, '0');
             document.querySelectorAll('.strike-dot').forEach((dot, i) => {
                 dot.className = i < p.strikes ? 'strike-dot strike-active' : 'strike-dot';
             });
@@ -462,10 +514,12 @@
                 const m = document.createElement('div');
                 m.className = `player-avatar ${i === currentPlayer ? 'current-player-glow' : ''}`;
                 m.style.backgroundColor = p.color;
-                if(p.avatarType === 'emoji') {
-                    m.innerText = p.avatar;
-                } else {
+                if (p.avatarType === 'image') {
                     m.style.backgroundImage = `url(${p.avatar})`;
+                    m.innerText = '';
+                } else {
+                    m.innerText = p.avatar;
+                    m.style.backgroundImage = 'none';
                 }
                 cell.appendChild(m);
             });
@@ -476,26 +530,7 @@
             const txt = document.getElementById('feedback-text');
             txt.innerText = correct ? '✅' : '❌';
             over.classList.replace('opacity-0', 'opacity-100');
-            txt.classList.add('scale-100');
-            setTimeout(() => {
-                over.classList.replace('opacity-100', 'opacity-0');
-                txt.classList.remove('scale-100');
-            }, 800);
-        }
-
-        function createSmokeEffect(x, y) {
-            for (let i = 0; i < 20; i++) {
-                const p = document.createElement('div');
-                p.className = 'smoke-particle';
-                const size = Math.random() * 20 + 10;
-                p.style.width = p.style.height = `${size}px`;
-                p.style.left = `${x}px`; p.style.top = `${y}px`;
-                p.style.setProperty('--tx', `${(Math.random() - 0.5) * 150}px`);
-                p.style.setProperty('--ty', `${-Math.random() * 150}px`);
-                p.style.animationDuration = `0.8s`;
-                document.body.appendChild(p);
-                setTimeout(() => p.remove(), 800);
-            }
+            setTimeout(() => over.classList.replace('opacity-100', 'opacity-0'), 800);
         }
 
         function downloadGameData() {
@@ -513,7 +548,8 @@
                 players = d.players; currentPlayer = d.currentPlayer;
                 document.getElementById('setupArea').classList.add('hidden');
                 document.getElementById('gameUI').classList.remove('hidden');
-                initBoard(); updateUI();
+                initBoard(); 
+                setTimeout(updateUI, 100);
             };
             reader.readAsText(e.target.files[0]);
         }
